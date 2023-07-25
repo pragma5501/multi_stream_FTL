@@ -41,5 +41,6 @@ void init_mapping_table ();
 ssd_t* trans_IO_to_ssd (ssd_t* my_ssd,_queue* free_q, int LBA, int stream_id);
 
 // Garbage Colloection
+void GC_trigger(ssd_t* my_ssd, _queue* free_q);
 int GC (ssd_t* my_ssd, _queue* free_q);
 int get_victim (ssd_t* my_ssd);

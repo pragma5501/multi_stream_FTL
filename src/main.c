@@ -56,7 +56,7 @@ int parse (char *text, ssd_t* my_ssd, _queue* free_q) {
         case WRITE:
 
                 my_ssd = trans_IO_to_ssd(my_ssd, free_q, LBA, stream_id);
-                if ((++progress) % (262144 ) == 0) {
+                if ((++progress) % (262144 * 100) == 0) {
                         GB += 1;
                         progress = 0;
 

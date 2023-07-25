@@ -21,6 +21,7 @@ ssd_t* ssd_t_init ()
         log_t_init(my_ssd);
 
         my_ssd->flag_GC      = GC_F;
+        my_ssd->flag_GC_re   = GC_F;
         return my_ssd;
 }
 
@@ -157,6 +158,11 @@ void destroy_ssd (ssd_t* my_ssd)
         free(my_ssd->block_op);
         free(my_ssd->idx_block_op);
         
+        for (i = 0; i < STREAM_NUM; i++) {
+                free(my_ssd->log_group[i]);
+        }
+
+        free(my_ssd->log_group);
         free(my_ssd);
 }
 
@@ -188,8 +194,8 @@ int free_q_pop (ssd_t* my_ssd, _queue* free_q, int stream_id)
                 my_ssd->block_op[stream_id] = q_pop(free_q);
 
                 my_ssd->log_group[stream_id]->segment_num++;
-                GC(my_ssd, free_q);
-                
+
+                GC_trigger(my_ssd, free_q);
         }
 
         int PPN = get_PPN(my_ssd, stream_id);
@@ -219,6 +225,7 @@ ssd_t* trans_IO_to_ssd (ssd_t* my_ssd,_queue* free_q, int LBA, int stream_id)
         if (mapping_table[LBA] != -1) {
                 PPN = mapping_table[LBA];
                 my_ssd = ssd_t_write(my_ssd, PPN, INVALID, LBA);
+                
         }
 
         PPN = free_q_pop(my_ssd, free_q, stream_id);
@@ -230,24 +237,32 @@ ssd_t* trans_IO_to_ssd (ssd_t* my_ssd,_queue* free_q, int LBA, int stream_id)
         return my_ssd;
 }
 
-int GC (ssd_t* my_ssd, _queue* free_q) 
+void GC_trigger(ssd_t* my_ssd, _queue* free_q) 
 {
         if (my_ssd->flag_GC == GC_T) {
-                return -1;
+                return;
         }
 
-        if (free_q->size > THRESHOLD_FREE_Q) {
-                return -1;
+
+        while (free_q->size < THRESHOLD_FREE_Q) {
+                GC(my_ssd, free_q);
         }
-        //printf("GC on\n");
-        //printf("free_q size : %d\n", free_q->size);
+        
+
+
+}
+
+int GC (ssd_t* my_ssd, _queue* free_q) 
+{
+
         my_ssd->flag_GC = GC_T;
         my_ssd->traff_GC++;
 
         int block_n_victim = get_victim(my_ssd);
         block_t* block_victim = my_ssd->block[block_n_victim];
-        
+
         int stream_id = block_victim->stream_id;
+        //printf("free_q size : %d\n", free_q->size);
 
         int i;
         for(i = 0; i < PAGE_NUM; i++) {
@@ -279,11 +294,15 @@ int GC (ssd_t* my_ssd, _queue* free_q)
 
         my_ssd->flag_GC = GC_F;
 
+
+
 }
 
 // select a block that has most invalid page
 int get_victim (ssd_t* my_ssd) 
 {
+
+        /*
         int target_id = 0;
         int max_seg = 0;
         int i;
@@ -292,15 +311,16 @@ int get_victim (ssd_t* my_ssd)
                 target_id = (max_seg < tmp_seg) ? i : target_id;
                 max_seg   = (max_seg < tmp_seg) ? tmp_seg : max_seg;
         }
+        */
         // printf("victim %d\n", target_id);
         int max = -1;
-        int max_i = -1;
-
+        int max_i = 0;
+        int i;
         for (i = 0; i < BLOCK_NUM; i++ ) {
                 int tmp = my_ssd->block[i]->invalid_page_num;
                 int tmp_id = my_ssd->block[i]->stream_id;
-                max_i = (tmp > max && target_id == tmp_id) ? i   : max_i;
-                max   = (tmp > max && target_id == tmp_id) ? tmp : max;
+                max_i = (tmp > max ) ? i   : max_i;
+                max   = (tmp > max ) ? tmp : max;
                 
         }
         // printf("invalid page num %d\n", max);

@@ -10,6 +10,11 @@
 
 #define STREAM_NUM 5 
 
+#define OFFSET_STREAM_0TH 0
+#define OFFSET_STREAM_1ST 16 * 1024
+#define OFFSET_STREAM_2ND 16 * 1024
+#define OFFSET_STREAM_3RD 16 * 1024
+#define OFFSET_STREAM_4TH 16 * 1024
 
 typedef struct block {
         int stream_id;
@@ -27,6 +32,7 @@ typedef struct log {
         int64_t segment_num;
 } log_t;
 
+
 typedef struct ssd {
         block_t **block;
         int       idx_block;
@@ -41,6 +47,7 @@ typedef struct ssd {
         log_t **log_group;
 
         int flag_GC;
+        int flag_GC_re;
 } ssd_t;
 
 
