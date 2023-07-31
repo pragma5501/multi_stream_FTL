@@ -96,7 +96,7 @@ void log_t_init(ssd_t* my_ssd) {
         for (i = 0; i < STREAM_NUM; i++) {
                 log[i] = (log_t*)malloc(sizeof(log_t));
                 log[i]->traff_erase = 0;
-                log[i]->valid_copy_ratio = 0;
+                log[i]->traff_valid_copy = 0;
                 log[i]->segment_num = 0;
         }
 
@@ -127,6 +127,7 @@ ssd_t* ssd_t_write (ssd_t* my_ssd, int PPN, int page_bit, int LBA)
         if (page_bit == INVALID) {
                 //printf("invalid block offset : %d\n", block_n);
                 my_ssd->block[block_n]->invalid_page_num += 1;
+
                 return my_ssd;
         }
 
@@ -157,6 +158,9 @@ void destroy_ssd (ssd_t* my_ssd)
 
         free(my_ssd->block_op);
         free(my_ssd->idx_block_op);
+        
+
+
         
         for (i = 0; i < STREAM_NUM; i++) {
                 free(my_ssd->log_group[i]);
@@ -190,16 +194,21 @@ int free_q_pop (ssd_t* my_ssd, _queue* free_q, int stream_id)
         
         if (my_ssd->idx_block_op[stream_id] >= PAGE_NUM) {
                 
+                my_ssd->block_op[stream_id]->flag_op = CLOSED;
+
                 my_ssd->idx_block_op[stream_id] = 0;
                 my_ssd->block_op[stream_id] = q_pop(free_q);
-
+                my_ssd->block_op[stream_id]->stream_id = stream_id;
                 my_ssd->log_group[stream_id]->segment_num++;
+
+
+                my_ssd->block_op[stream_id]->flag_op = OPEN;
+                my_ssd->idx_block_op[stream_id] += 1;
 
                 GC_trigger(my_ssd, free_q);
         }
 
         int PPN = get_PPN(my_ssd, stream_id);
-        my_ssd->block[(int)(PPN / (PAGE_NUM))]->stream_id = stream_id;
         my_ssd->idx_block_op[stream_id] += 1;
 
         return PPN;
@@ -215,11 +224,27 @@ void init_mapping_table ()
         }
 }
 
+double get_utilization ()
+{      
+        int valid_LBA;
+
+        int i;
+        for (i = 0; i < M_TABLE_SIZE; i++) {
+                if (mapping_table[i] == -1) {
+                        continue;
+                }
+                valid_LBA++;
+        }
+
+        return (double)valid_LBA / (double)(M_TABLE_SIZE);
+}
+
 
 
 ssd_t* trans_IO_to_ssd (ssd_t* my_ssd,_queue* free_q, int LBA, int stream_id) 
 {
         int PPN;
+
 
         // if modify
         if (mapping_table[LBA] != -1) {
@@ -262,6 +287,9 @@ int GC (ssd_t* my_ssd, _queue* free_q)
         block_t* block_victim = my_ssd->block[block_n_victim];
 
         int stream_id = block_victim->stream_id;
+        //if (stream_id == 0) {
+        //        printf("stream 0 invalid page num : %d\n", my_ssd->block[block_n_victim]->invalid_page_num);
+        //}
         //printf("free_q size : %d\n", free_q->size);
 
         int i;
@@ -273,20 +301,26 @@ int GC (ssd_t* my_ssd, _queue* free_q)
                 }
 
                 // a page_bit is valid
+                if (page_bit != VALID) {
+                        continue;
+                }
+
                 int PPN = free_q_pop(my_ssd, free_q, stream_id);
                 int LBA = block_victim->LBA[i];
+
                 ssd_t_write(my_ssd, PPN, VALID, LBA);
 
-                my_ssd->log_group[stream_id]->valid_copy_ratio++;
+                my_ssd->log_group[stream_id]->traff_valid_copy++;
         }
         //printf("GC result\n");
         //printf("victim block : %d\n", block_n_victim);
         //printf("invalid page num : %d\n", my_ssd->block[block_n_victim]->invalid_page_num);
 
-        // page_erase(my_ssd->block[block_n_victim]->page_bitmap);
+        page_erase(my_ssd->block[block_n_victim]->page_bitmap);
         my_ssd->block[block_n_victim] = block_victim;
         my_ssd->block[block_n_victim]->invalid_page_num = 0;
         my_ssd->block[block_n_victim]->stream_id = -1;
+
         q_push(free_q, my_ssd->block[block_n_victim]);
         
         my_ssd->log_group[stream_id]->segment_num--;
@@ -317,8 +351,12 @@ int get_victim (ssd_t* my_ssd)
         int max_i = 0;
         int i;
         for (i = 0; i < BLOCK_NUM; i++ ) {
+                if (my_ssd->block[i]->flag_op != CLOSED) {
+                        continue;
+                }
                 int tmp = my_ssd->block[i]->invalid_page_num;
                 int tmp_id = my_ssd->block[i]->stream_id;
+
                 max_i = (tmp > max ) ? i   : max_i;
                 max   = (tmp > max ) ? tmp : max;
                 
@@ -326,3 +364,5 @@ int get_victim (ssd_t* my_ssd)
         // printf("invalid page num %d\n", max);
         return max_i;
 }
+
+

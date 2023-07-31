@@ -32,6 +32,10 @@ int parse (char *text, ssd_t* my_ssd, _queue* free_q) {
         int size;
         int stream_id;
 
+        double waf;
+        double tmp_waf = 0;
+        double utilization;
+
         if (sscanf(text, "%lf %d %d %d %d", &time, &type, &LBA, &size, &stream_id) == 5) {
                 #ifdef DEBUG
                 
@@ -56,16 +60,19 @@ int parse (char *text, ssd_t* my_ssd, _queue* free_q) {
         case WRITE:
 
                 my_ssd = trans_IO_to_ssd(my_ssd, free_q, LBA, stream_id);
-                if ((++progress) % (262144 * 100) == 0) {
-                        GB += 1;
-                        progress = 0;
 
-                        printf("[Progress %d GB] : WAF : %.10f\n", GB, get_WAF(my_ssd));
-                        //printf("[Progress %d GB]\n", GB);
-                        for(int i = 0; i < STREAM_NUM; i++) {
-                                printf("stream %d request : %d\n", i,stream_log[i]);
-                        }
+                if ((++progress) % (262144 * 100) == 0) {
+                        GB += 100;
+                        waf = get_WAF(my_ssd);
+                        utilization = get_utilization();
+
+                        printf("[Progress %d GB] : WAF : %.2f, TMP_WAF: %.2f, Utiliztion: %.2f\n", GB, waf, tmp_waf, utilization);
+
                         show_stream_group_log(my_ssd);
+                }
+                if ((progress) % (262144 * 50) == 0) {
+                        
+                        tmp_waf = get_WAF(my_ssd);
                 }
                 break;
                 

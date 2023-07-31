@@ -3,10 +3,12 @@
 
 #define PAGE_SIZE 4 * 1024 // Byte
 #define BLOCK_SIZE 512 * (PAGE_SIZE) // 512 page // Byte
-#define SSD_SIZE 32 * 1024 * 1024 * 1024
+
 
 #define PAGE_NUM 512
-#define BLOCK_NUM 4 * 16 * 1024
+#define BLOCK_NUM 65536
+
+#define SSD_SIZE (PHYSIZE)
 
 #define STREAM_NUM 5 
 
@@ -16,9 +18,12 @@
 #define OFFSET_STREAM_3RD 16 * 1024
 #define OFFSET_STREAM_4TH 16 * 1024
 
+
 typedef struct block {
         int stream_id;
         int offset;
+        int flag_op; // open : 1, closed 0,
+
         int* LBA;
 
         int *page_bitmap;  // status
@@ -28,7 +33,7 @@ typedef struct block {
 
 typedef struct log {
         int64_t traff_erase;
-        int64_t valid_copy_ratio;
+        int64_t traff_valid_copy;
         int64_t segment_num;
 } log_t;
 

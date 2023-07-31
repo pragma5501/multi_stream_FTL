@@ -6,7 +6,7 @@
 
 
 
-#define M_TABLE_SIZE 4 * 8 * 1024 * 1024 
+#define M_TABLE_SIZE 3125* 100 * 100
 
 #define THRESHOLD_FREE_Q 100
 
@@ -19,6 +19,9 @@ enum IO {
 
         GC_T = 0,
         GC_F = 1,
+
+        OPEN = 1,
+        CLOSED = 0,
 };
 
 
@@ -37,6 +40,7 @@ void destroy_ssd (ssd_t* my_ssd);
 _queue* free_q_init (ssd_t* my_ssd, _queue* q);
 int free_q_pop (ssd_t* my_ssd,_queue* free_q, int stream_id);
 void init_mapping_table ();
+double get_utilization ();
 
 ssd_t* trans_IO_to_ssd (ssd_t* my_ssd,_queue* free_q, int LBA, int stream_id);
 
